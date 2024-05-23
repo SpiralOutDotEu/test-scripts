@@ -1,0 +1,15 @@
+services:
+  rabbitmq:
+    image: rabbitmq:management
+    ports:
+      - "5672:5672"  # AMQP port
+      - "15672:15672"  # Management UI port
+    environment:
+      RABBITMQ_DEFAULT_USER: "your_username"
+      RABBITMQ_DEFAULT_PASS: "your_password"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+volumes:
+  rabbitmq_data:
+    driver: local

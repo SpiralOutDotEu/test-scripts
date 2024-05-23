@@ -1,53 +1,41 @@
 class RateLimiter {
-  constructor(maxRequests, refillInterval) {
-    this.maxRequests = maxRequests;
-    this.refillInterval = refillInterval;
-    this.users = new Map();
+  constructor(tokensPerInterval, interval) {
+    this.tokensPerInterval = tokensPerInterval;
+    this.interval = interval;
+    this.tokens = tokensPerInterval;
+    this.lastRefill = Date.now();
   }
 
-  _refillTokens(userId) {
-    const currentTime = Date.now;
-    const userData = this.users.get(userId);
-
-    if (!userData) {
-      this.users.set(userId, {
-        tokens: this.maxRequests,
-        lastRefillTime: currentTime,
-      });
-      return;
-    }
-
-    const { tokens, lastRefillTime } = userData;
-    const timeElapsed = currentTime - lastRefillTime;
-    const tokensToAdd = Math.floor(timeElapsed / this.refillInterval);
-
+  refillTokens() {
+    const now = Date.now();
+    const elapsed = now - this.lastRefill;
+    const tokensToAdd = Math.floor(elapsed / this.interval) * this.tokensPerInterval;
     if (tokensToAdd > 0) {
-        const newTokens = Math.min(tokens + tokensToAdd, this.maxRequests);
-        this.users.set(userId, { tokens: newTokens, lastRefillTime: currentTime });
-      } else {
-        this.users.set(userId, { tokens, lastRefillTime });
-      }
+      this.tokens = Math.min(this.tokens + tokensToAdd, this.tokensPerInterval);
+      this.lastRefill = now;
+    }
   }
 
-  isAllowed(userId) {
-    this._refillTokens(userId);
-    const userData = this.users.get(userId);
-
-    if (userData.tokens > 0) {
-      this.users.set(userId, {
-        tokens: userData.tokens - 1,
-        lastRefillTime: userData.lastRefillTime,
-      });
+  tryRemoveTokens(count) {
+    this.refillTokens();
+    if (this.tokens >= count) {
+      this.tokens -= count;
       return true;
     }
     return false;
   }
 }
 
+// Usage
+const limiter = new RateLimiter(5, 1000); // 5 tokens per second
 
-// example
-const rateLimiter = new RateLimiter(5, 1000); 
+function handleRequest(req, res) {
+  if (limiter.tryRemoveTokens(1)) {
+    res.status(200).send('Request successful');
+  } else {
+    res.status(429).send('Rate limit exceeded');
+  }
+}
 
-setInterval(() => {
-    console.log(rateLimiter.isAllowed('user1'));
-  }, 1200);
+// Simulate incoming requests
+setInterval(() => handleRequest({}, { status: code => ({ send: msg => console.log(code, msg) }) }), 100);
